@@ -9,10 +9,10 @@ words = "CE SITE CONTIENT QUATRE TOMBEAUX DE LA DYNASTIE ASHÉMÉNIDE ET SEPT DE
 for word in words:
     word = word.lower()
     if word in spell:
-        print("'{}' is spelled correctly!".format(word))
+        print(f"'{word}' is spelled correctly!")
     else:
         cor = spell.correction(word)
-        print("The best spelling for '{}' is '{}'".format(word, cor))
+        print(f"The best spelling for '{word}' is '{cor}'")
 
         print("If that is not enough; here are all possible candidate words:")
         print(spell.candidates(word))
