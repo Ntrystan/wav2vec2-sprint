@@ -355,26 +355,27 @@ class CTCTrainer(Trainer):
         ):
             return None
 
-        # Build the sampler.
-        if self.args.group_by_length:
-            lengths = self.train_dataset[self.length_field_name] if self.length_field_name is not None else None
-            model_input_name = self.tokenizer.model_input_names[0] if self.tokenizer is not None else None
-            if self.args.world_size <= 1:
-                return LengthGroupedSampler(
-                    self.train_dataset, self.args.train_batch_size, lengths=lengths, model_input_name=model_input_name
-                )
-            else:
-                return DistributedLengthGroupedSampler(
-                    self.train_dataset,
-                    self.args.train_batch_size,
-                    num_replicas=self.args.world_size,
-                    rank=self.args.process_index,
-                    lengths=lengths,
-                    model_input_name=model_input_name,
-                )
-
-        else:
+        if not self.args.group_by_length:
             return super()._get_train_sampler()
+        lengths = self.train_dataset[self.length_field_name] if self.length_field_name is not None else None
+        model_input_name = self.tokenizer.model_input_names[0] if self.tokenizer is not None else None
+        return (
+            LengthGroupedSampler(
+                self.train_dataset,
+                self.args.train_batch_size,
+                lengths=lengths,
+                model_input_name=model_input_name,
+            )
+            if self.args.world_size <= 1
+            else DistributedLengthGroupedSampler(
+                self.train_dataset,
+                self.args.train_batch_size,
+                num_replicas=self.args.world_size,
+                rank=self.args.process_index,
+                lengths=lengths,
+                model_input_name=model_input_name,
+            )
+        )
 
     def create_scheduler(self, num_training_steps: int):
         """
@@ -539,7 +540,7 @@ def main():
 
     os.makedirs(training_args.output_dir, exist_ok=True)
     os.makedirs(model_args.cache_dir, exist_ok=True)
-    
+
     wandb.init(dir=model_args.cache_dir)
 
     # Detecting last checkpoint.
@@ -567,8 +568,10 @@ def main():
 
     # Log on each process the small summary:
     logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+        (
+            f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
+            + f"distributed training: {training_args.local_rank != -1}, 16-bits training: {training_args.fp16}"
+        )
     )
     # Set the verbosity to info of the Transformers logger (on main process only):
     if is_main_process(training_args.local_rank):
@@ -586,7 +589,7 @@ def main():
         split="train+validation", 
         cache_dir=model_args.cache_dir
     )
-    
+
     print("DATASET COUNT:")
     print(collections.Counter(dataset["dataset"]))
 
@@ -605,7 +608,7 @@ def main():
 
 
     # Filtering dataset:
-    
+
     train_dataset_original_size = len(train_dataset)
     if eval_dataset is not None:
         eval_dataset_original_size = len(eval_dataset)
@@ -620,7 +623,7 @@ def main():
         lambda example: example["duration"] >= data_args.min_duration and example["duration"] <= data_args.max_duration,
         num_proc=data_args.preprocessing_num_workers
     )
-    
+
     if data_args.max_train_samples is not None and train_dataset_original_size > data_args.max_train_samples:
         train_dataset = train_dataset.select(range(data_args.max_train_samples))
 
@@ -630,7 +633,7 @@ def main():
     train_dataset_final_size = len(train_dataset)
     if eval_dataset is not None:
         eval_dataset_final_size = len(eval_dataset)
-    
+
     logger.info(f"After filtering {train_dataset_final_size} of {train_dataset_original_size} samples will be used to train the model")
     if eval_dataset is not None:
         logger.info(f"After filtering {eval_dataset_final_size} of {eval_dataset_original_size} samples will be used to eval the model")
@@ -653,13 +656,13 @@ def main():
             remove_columns=["sentence"], 
             num_proc=data_args.preprocessing_num_workers
         )
-    
+
     # Load pretrained model and tokenizer
     #
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    
+
     if model_args.model_name_or_path in PRETRAINED_MODELS:
         dataset = datasets.concatenate_datasets([train_dataset, eval_dataset]) if eval_dataset is not None else train_dataset
         if len(dataset) > additional_training_args.max_dataset_size_vocab_builder:
@@ -701,7 +704,7 @@ def main():
 
     # save the feature_extractor and the tokenizer
     processor.save_pretrained(training_args.output_dir)
-    
+
     model = Wav2Vec2ForCTC.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
@@ -726,7 +729,7 @@ def main():
         batch["sampling_rate"] = sampling_rate
         batch["target_text"] = batch["text"]
         return batch
-    
+
     print("TRAIN DATASET COUNT:")
     print(collections.Counter(train_dataset["dataset"]))
     print("EVAL DATASET COUNT:")
@@ -750,7 +753,7 @@ def main():
             len(set(batch["sampling_rate"])) == 1
         ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
         batch["input_values"] = processor(batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
-        
+
         # Setup the processor for targets
         with processor.as_target_processor():
             batch["labels"] = processor(batch["target_text"]).input_ids

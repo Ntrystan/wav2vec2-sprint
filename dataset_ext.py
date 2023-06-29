@@ -14,6 +14,7 @@
 # limitations under the License.
 """ Common Voice Dataset"""
 
+
 from __future__ import absolute_import, division, print_function
 
 import os
@@ -635,11 +636,11 @@ _TIMIT = {
 _LIBRISPEECH_DL_URL = "http://www.openslr.org/resources/12/"
 _LIBRISPEECH = {
     "en": [
-        _LIBRISPEECH_DL_URL + "dev-clean.tar.gz", # 2703 samples
-        _LIBRISPEECH_DL_URL + "dev-other.tar.gz", # 2864 samples
-        _LIBRISPEECH_DL_URL + "train-clean-100.tar.gz", # 28539 samples
-        _LIBRISPEECH_DL_URL + "train-clean-360.tar.gz", # 104014 samples
-        _LIBRISPEECH_DL_URL + "train-other-500.tar.gz", # 148688 samples
+        f"{_LIBRISPEECH_DL_URL}dev-clean.tar.gz",
+        f"{_LIBRISPEECH_DL_URL}dev-other.tar.gz",
+        f"{_LIBRISPEECH_DL_URL}train-clean-100.tar.gz",
+        f"{_LIBRISPEECH_DL_URL}train-clean-360.tar.gz",
+        f"{_LIBRISPEECH_DL_URL}train-other-500.tar.gz",
     ]
 }
 
@@ -843,7 +844,7 @@ class CommonVoice(datasets.GeneratorBasedBuilder):
                 if len(field_values) < len(data_fields):
                     field_values += (len(data_fields) - len(field_values)) * ["''"]
 
-                sample = {key: value for key, value in zip(data_fields, field_values)}
+                sample = dict(zip(data_fields, field_values))
 
                 new_path = self._convert_to_flac_and_save_it(sample.get("path"))
                 speech_array, sampling_rate = sf.read(new_path)
@@ -1145,59 +1146,52 @@ class CommonVoice(datasets.GeneratorBasedBuilder):
 
         if timit_dir is not None and _id < max_samples:
             for example in self._timit_examples_generator(timit_dir):
-                if _id < max_samples:
-                    yield _id, example
-                    _id += 1
-                else:
+                if _id >= max_samples:
                     break
 
+                yield _id, example
+                _id += 1
         if css10_dir is not None and _id < max_samples:
             for example in self._css10_examples_generator(css10_dir):
-                if _id < max_samples:
-                    yield _id, example
-                    _id += 1
-                else:
+                if _id >= max_samples:
                     break
 
+                yield _id, example
+                _id += 1
         if librispeech_dirs is not None and _id < max_samples:
             for librispeech_dir in librispeech_dirs:
                 for example in self._librispeech_examples_generator(librispeech_dir):
-                    if _id < max_samples:
-                        yield _id, example
-                        _id += 1
-                    else:
+                    if _id >= max_samples:
                         break
 
+                    yield _id, example
+                    _id += 1
         if jsut_dir is not None and _id < max_samples:
             for example in self._jsut_examples_generator(jsut_dir):
-                if _id < max_samples:
-                    yield _id, example
-                    _id += 1
-                else:
+                if _id >= max_samples:
                     break
 
+                yield _id, example
+                _id += 1
         if nst_files_dir is not None and _id < max_samples:
             for example in self._nst_examples_generator(nst_metadata_dir, nst_files_dir):
-                if _id < max_samples:
-                    yield _id, example
-                    _id += 1
-                else:
+                if _id >= max_samples:
                     break
 
+                yield _id, example
+                _id += 1
         if free_st_dir is not None and _id < max_samples:
             for example in self._free_st_examples_generator(free_st_dir):
-                if _id < max_samples:
-                    yield _id, example
-                    _id += 1
-                else:
+                if _id >= max_samples:
                     break
-        
+
+                yield _id, example
+                _id += 1
         if arabic_speech_dir is not None and _id < max_samples:
             root_dirs = [arabic_speech_dir, os.path.join(arabic_speech_dir, "test set")]
             for root_dir in root_dirs:
                 for example in self._arabic_speech_examples_generator(root_dir):
-                    if _id < max_samples:
-                        yield _id, example
-                        _id += 1
-                    else:
+                    if _id >= max_samples:
                         break
+                    yield _id, example
+                    _id += 1
